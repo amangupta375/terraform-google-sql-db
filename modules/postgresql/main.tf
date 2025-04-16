@@ -21,7 +21,7 @@ locals {
   # Determine the instance name (newly generated or existing)
   # Note: local.instance_name is still used for the *creation* scenario name generation
   instance_creation_name = var.random_instance_name ? "${var.name}-${random_id.suffix[0].hex}" : var.name
-  target_instance_name   = var.use_existing_instance ? var.existing_instance_name 
+  target_instance_name   = var.use_existing_instance ? var.existing_instance_name : local.instance_creation_name
 
   is_secondary_instance = var.master_instance_name != null
 
