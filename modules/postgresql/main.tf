@@ -15,7 +15,14 @@
  */
 
 locals {
-  instance_name         = var.random_instance_name ? "${var.name}-${random_id.suffix[0].hex}" : var.name
+  # Determine the project ID for the instance (existing or new)
+  instance_project_id = coalesce(var.existing_instance_project_id, var.project_id)
+
+  # Determine the instance name (newly generated or existing)
+  # Note: local.instance_name is still used for the *creation* scenario name generation
+  instance_creation_name = var.random_instance_name ? "${var.name}-${random_id.suffix[0].hex}" : var.name
+  target_instance_name   = var.use_existing_instance ? var.existing_instance_name 
+
   is_secondary_instance = var.master_instance_name != null
 
   ip_configuration_enabled = length(keys(var.ip_configuration)) > 0 ? true : false
@@ -47,18 +54,33 @@ locals {
   database_name = var.enable_default_db ? var.db_name : (length(var.additional_databases) > 0 ? var.additional_databases[0].name : "")
 
   encryption_key = var.encryption_key_name != null ? var.encryption_key_name : var.use_autokey ? google_kms_key_handle.default[0].kms_key : null
+
+  # --- Unified instance data ---
+  # This local will hold the attributes of the instance, whether created or existing
+  instance_data = var.use_existing_instance ? data.google_sql_database_instance.existing[0] : google_sql_database_instance.default[0]
+
 }
 
+# --- Data source to fetch existing instance ---
+data "google_sql_database_instance" "existing" {
+  count   = var.use_existing_instance ? 1 : 0
+  provider = google-beta # Ensure provider consistency if needed
+  name    = var.existing_instance_name
+  project = local.instance_project_id
+}
+
+
 resource "random_id" "suffix" {
-  count = var.random_instance_name ? 1 : 0
+  count = !var.use_existing_instance && var.random_instance_name ? 1 : 0 
 
   byte_length = 4
 }
 
 resource "google_sql_database_instance" "default" {
+  count               = var.use_existing_instance ? 0 : 1 # Create only if not using existing
   provider            = google-beta
-  project             = var.project_id
-  name                = local.instance_name
+  project             = local.instance_project_id # Use the determined project ID
+  name                = local.instance_creation_name # Use the generated name for creation
   database_version    = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
   maintenance_version = var.maintenance_version
   region              = var.region
@@ -217,8 +239,8 @@ resource "google_sql_database_instance" "default" {
 resource "google_kms_key_handle" "default" {
   count                  = var.use_autokey ? 1 : 0
   provider               = google-beta
-  project                = var.project_id
-  name                   = local.instance_name
+  project                = local.instance_project_id
+  name                   = local.instance_creation_name
   location               = coalesce(var.region, join("-", slice(split("-", var.zone), 0, 2)))
   resource_type_selector = "sqladmin.googleapis.com/Instance"
 }
@@ -226,8 +248,8 @@ resource "google_kms_key_handle" "default" {
 resource "google_sql_database" "default" {
   count           = var.enable_default_db ? 1 : 0
   name            = var.db_name
-  project         = var.project_id
-  instance        = google_sql_database_instance.default.name
+  project         = local.instance_data.project 
+  instance        = local.instance_data.name    
   charset         = var.db_charset
   collation       = var.db_collation
   depends_on      = [null_resource.module_depends_on, google_sql_database_instance.default]
@@ -236,11 +258,11 @@ resource "google_sql_database" "default" {
 
 resource "google_sql_database" "additional_databases" {
   for_each        = local.databases
-  project         = var.project_id
+  project         = local.instance_data.project
   name            = each.value.name
   charset         = lookup(each.value, "charset", null)
   collation       = lookup(each.value, "collation", null)
-  instance        = google_sql_database_instance.default.name
+  instance        = local.instance_data.name
   depends_on      = [null_resource.module_depends_on, google_sql_database_instance.default]
   deletion_policy = var.database_deletion_policy
 }
@@ -248,7 +270,7 @@ resource "google_sql_database" "additional_databases" {
 resource "random_password" "user-password" {
   count = var.enable_default_user ? 1 : 0
   keepers = {
-    name = google_sql_database_instance.default.name
+    name = local.instance_data.name
   }
   min_lower   = 1
   min_numeric = 1
@@ -269,7 +291,7 @@ resource "random_password" "additional_passwords" {
   for_each = local.users
 
   keepers = {
-    name = google_sql_database_instance.default.name
+    name = local.instance_data.name
   }
   min_lower   = 1
   min_numeric = 1
@@ -289,8 +311,8 @@ resource "random_password" "additional_passwords" {
 resource "google_sql_user" "default" {
   count    = var.enable_default_user ? 1 : 0
   name     = var.user_name
-  project  = var.project_id
-  instance = google_sql_database_instance.default.name
+  project  = local.instance_data.project 
+  instance = local.instance_data.name    
   password = var.user_password == "" ? random_password.user-password[0].result : var.user_password
   depends_on = [
     null_resource.module_depends_on,
@@ -302,10 +324,10 @@ resource "google_sql_user" "default" {
 
 resource "google_sql_user" "additional_users" {
   for_each = local.users
-  project  = var.project_id
+  project  = local.instance_data.project 
   name     = each.value.name
   password = each.value.random_password ? random_password.additional_passwords[each.value.name].result : each.value.password
-  instance = google_sql_database_instance.default.name
+  instance = local.instance_data.name
   depends_on = [
     null_resource.module_depends_on,
     google_sql_database_instance.default,
@@ -317,9 +339,9 @@ resource "google_sql_user" "additional_users" {
 resource "google_sql_user" "iam_account" {
   for_each = local.iam_users
 
-  project  = var.project_id
+  project  = local.instance_data.project # Get project from the instance data
   name     = each.value.email
-  instance = google_sql_database_instance.default.name
+  instance = local.instance_data.name
 
   type = each.value.type
 
@@ -331,7 +353,7 @@ resource "google_sql_user" "iam_account" {
 
 resource "google_project_iam_member" "database_integration" {
   for_each = toset(var.database_integration_roles)
-  project  = var.project_id
+  project  = local.instance_data.project 
   role     = each.value
   member   = "serviceAccount:${google_sql_database_instance.default.service_account_email_address}"
 }

@@ -404,6 +404,10 @@ spec:
         description: The roles required by default database instance service account for integration with GCP services
         varType: list(string)
         defaultValue: []
+      - name: use_autokey
+        description: Enable the use of autokeys from Google Cloud KMS for CMEK. This requires autokey already configured in the project.
+        varType: bool
+        defaultValue: false
     outputs:
       - name: additional_users
         description: List of maps of additional users and passwords
@@ -902,6 +906,7 @@ spec:
       - level: Project
         roles:
           - roles/cloudkms.admin
+          - roles/cloudkms.autokeyAdmin
           - roles/cloudkms.cryptoKeyEncrypterDecrypter
           - roles/cloudscheduler.admin
           - roles/cloudsql.admin
