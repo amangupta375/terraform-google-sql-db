@@ -347,12 +347,18 @@ resource "google_sql_user" "iam_account" {
   deletion_policy = var.user_deletion_policy
 }
 
+# --- IAM Binding ---
+# Reference the instance service account via local.instance_data
 resource "google_project_iam_member" "database_integration" {
+  # This resource might behave unexpectedly if the instance is existing and in another project,
+  # as it tries to grant roles in var.project_id to the service account of an instance
+  # potentially in local.instance_project_id. Ensure var.project_id is the correct one for the IAM binding.
   for_each = toset(var.database_integration_roles)
-  project  = local.instance_data.project 
+  project  = local.instance_data.project # Bind role in the instance's project
   role     = each.value
   member   = "serviceAccount:${local.instance_data.service_account_email_address}"
-  depends_on = [local.instance_data.id]
+  # Ensure dependency on the instance being available
+  depends_on = [local.instance_data.id] # Explicit dependency using an attribute
 }
 
 resource "null_resource" "module_depends_on" {
