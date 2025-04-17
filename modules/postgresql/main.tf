@@ -252,7 +252,7 @@ resource "google_sql_database" "default" {
   instance        = local.instance_data.name    
   charset         = var.db_charset
   collation       = var.db_collation
-  depends_on      = [null_resource.module_depends_on, google_sql_database_instance.default]
+  depends_on      = [null_resource.module_depends_on]
   deletion_policy = var.database_deletion_policy
 }
 
@@ -263,7 +263,7 @@ resource "google_sql_database" "additional_databases" {
   charset         = lookup(each.value, "charset", null)
   collation       = lookup(each.value, "collation", null)
   instance        = local.instance_data.name
-  depends_on      = [null_resource.module_depends_on, google_sql_database_instance.default]
+  depends_on      = [null_resource.module_depends_on]
   deletion_policy = var.database_deletion_policy
 }
 
@@ -316,8 +316,6 @@ resource "google_sql_user" "default" {
   password = var.user_password == "" ? random_password.user-password[0].result : var.user_password
   depends_on = [
     null_resource.module_depends_on,
-    google_sql_database_instance.default,
-    google_sql_database_instance.replicas,
   ]
   deletion_policy = var.user_deletion_policy
 }
@@ -330,8 +328,6 @@ resource "google_sql_user" "additional_users" {
   instance = local.instance_data.name
   depends_on = [
     null_resource.module_depends_on,
-    google_sql_database_instance.default,
-    google_sql_database_instance.replicas,
   ]
   deletion_policy = var.user_deletion_policy
 }
@@ -355,7 +351,8 @@ resource "google_project_iam_member" "database_integration" {
   for_each = toset(var.database_integration_roles)
   project  = local.instance_data.project 
   role     = each.value
-  member   = "serviceAccount:${google_sql_database_instance.default.service_account_email_address}"
+  member   = "serviceAccount:${local.instance_data.service_account_email_address}"
+  depends_on = [local.instance_data.id]
 }
 
 resource "null_resource" "module_depends_on" {
