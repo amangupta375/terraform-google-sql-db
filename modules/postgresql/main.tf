@@ -350,8 +350,6 @@ resource "google_project_iam_member" "database_integration" {
   project  = local.instance_data.project # Bind role in the instance's project
   role     = each.value
   member   = "serviceAccount:${local.instance_data.service_account_email_address}"
-  # Ensure dependency on the instance being available
-  depends_on = [local.instance_data.id] # Explicit dependency using an attribute
 }
 
 # --- Module Depends On ---
