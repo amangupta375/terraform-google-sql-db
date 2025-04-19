@@ -159,7 +159,7 @@ output "env_vars" {
 output "apphub_service_uri" {
   value = {
     service_uri = "//sqladmin.googleapis.com/projects${element(split("/projects", local.instance_data.self_link), 1)}"
-    service_id  = substr("${local.instance_data.name}-${md5("${local.instance_data.region}-${local.instance_data.project}")}", 0, 63)
+    service_id  = substr("${var.name}-${md5("${var.region}-${var.project_id}")}", 0, 63)
     location    = local.instance_data.region
   }
   description = "Service URI in CAIS style to be used by Apphub."
