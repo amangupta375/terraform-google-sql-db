@@ -468,3 +468,21 @@ variable "use_autokey" {
   type        = bool
   default     = false
 }
+
+variable "use_existing_instance" {
+  description = "Set to true to use an existing Cloud SQL instance instead of creating a new one. If true, 'existing_instance_name' must be provided."
+  type        = bool
+  default     = false
+}
+
+variable "existing_instance_name" {
+  description = "The name of the existing Cloud SQL instance to use. Required if 'use_existing_instance' is true."
+  type        = string
+  default     = null # Explicitly null, required only when use_existing_instance is true
+}
+
+variable "existing_instance_project_id" {
+  description = "The project ID of the existing Cloud SQL instance. Defaults to the value of 'project_id' if not set. Useful if the instance is in a different project than where other resources are managed."
+  type        = string
+  default     = null
+}

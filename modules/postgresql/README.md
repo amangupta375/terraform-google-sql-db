@@ -146,6 +146,8 @@ module "pg" {
 | enable\_google\_ml\_integration | Enable database ML integration | `bool` | `false` | no |
 | enable\_random\_password\_special | Enable special characters in generated random passwords. | `bool` | `false` | no |
 | encryption\_key\_name | The full path to the encryption key used for the CMEK disk encryption | `string` | `null` | no |
+| existing\_instance\_name | The name of the existing Cloud SQL instance to use. Required if 'use\_existing\_instance' is true. | `string` | `null` | no |
+| existing\_instance\_project\_id | The project ID of the existing Cloud SQL instance. Defaults to the value of 'project\_id' if not set. Useful if the instance is in a different project than where other resources are managed. | `string` | `null` | no |
 | follow\_gae\_application | A Google App Engine application whose zone to remain in. Must be in the same region as this instance. | `string` | `null` | no |
 | iam\_users | A list of IAM users to be created in your CloudSQL instance. iam.users.type can be CLOUD\_IAM\_USER, CLOUD\_IAM\_SERVICE\_ACCOUNT, CLOUD\_IAM\_GROUP and is required for type CLOUD\_IAM\_GROUP (IAM groups) | <pre>list(object({<br>    id    = string,<br>    email = string,<br>    type  = optional(string)<br>  }))</pre> | `[]` | no |
 | insights\_config | The insights\_config settings for the database. | <pre>object({<br>    query_plans_per_minute  = optional(number, 5)<br>    query_string_length     = optional(number, 1024)<br>    record_application_tags = optional(bool, false)<br>    record_client_address   = optional(bool, false)<br>  })</pre> | `null` | no |
@@ -172,6 +174,7 @@ module "pg" {
 | tier | The tier for the Cloud SQL instance. | `string` | `"db-f1-micro"` | no |
 | update\_timeout | The optional timout that is applied to limit long database updates. | `string` | `"30m"` | no |
 | use\_autokey | Enable the use of autokeys from Google Cloud KMS for CMEK. This requires autokey already configured in the project. | `bool` | `false` | no |
+| use\_existing\_instance | Set to true to use an existing Cloud SQL instance instead of creating a new one. If true, 'existing\_instance\_name' must be provided. | `bool` | `false` | no |
 | user\_deletion\_policy | The deletion policy for the user. Setting ABANDON allows the resource to be abandoned rather than deleted. This is useful for Postgres, where users cannot be deleted from the API if they have been granted SQL roles. Possible values are: "ABANDON". | `string` | `null` | no |
 | user\_labels | The key/value labels for the Cloud SQL instances. | `map(string)` | `{}` | no |
 | user\_name | The name of the default user | `string` | `"default"` | no |
